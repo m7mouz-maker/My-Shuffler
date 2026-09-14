@@ -62,7 +62,7 @@ const shows={
     tagline:"Nobody exists on purpose. Everybody's gonna die. Come watch TV.",
     accent:"#97ce4c",
     logo:"https://upload.wikimedia.org/wikipedia/commons/b/b1/Rick_and_Morty.svg",
-    backdrop:"https://image.tmdb.org/t/p/original/gGmf3CyHdXvaZtcun0DvU1WSNft.jpg",
+    backdrop:"https://cdn.mos.cms.futurecdn.net/JbHJDPJZLi5FEhLQDvzxe3.jpg",
     counts:[11,10,10,10,10,10,10,10,10],
     service:{
       name:"Netflix",

@@ -456,6 +456,35 @@ body::after{
   .surprise-hero{min-height:65px;font-size:19px}
 }
 
+
+.episode-meta{
+  margin-top:18px;
+  padding:15px 17px;
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(7,10,15,.42);
+  -webkit-backdrop-filter:blur(18px) saturate(125%);
+  backdrop-filter:blur(18px) saturate(125%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.055);
+}
+.episode-meta[hidden]{display:none}
+.episode-title{
+  font-size:17px;
+  line-height:1.25;
+  font-weight:900;
+  color:#fff;
+}
+.episode-summary{
+  margin-top:6px;
+  font-size:13px;
+  line-height:1.55;
+  color:#b5bbc7;
+}
+.episode-summary.loading{
+  opacity:.62;
+  font-style:italic;
+}
+
 </style>
 </head>
 <body>
@@ -483,6 +512,10 @@ body::after{
 
         <div id="episode" class="episode">S?? · E??</div>
         <div id="episodeInfo" class="episode-info">Pick a show and shuffle</div>
+        <div id="episodeMeta" class="episode-meta" hidden>
+          <div id="episodeTitle" class="episode-title"></div>
+          <div id="episodeSummary" class="episode-summary"></div>
+        </div>
 
         <div class="hero-actions">
           <button class="btn btn-main" onclick="shuffleSelected()">Shuffle Episode</button>
@@ -582,14 +615,81 @@ function selectShow(key){
   document.getElementById("episode").textContent="S?? · E??";
   document.getElementById("episodeInfo").textContent=
     shows[current].name.toUpperCase()+" — READY TO SHUFFLE";
+  clearEpisodeMeta();
+}
+
+function stripHtml(html){
+  const temp=document.createElement("div");
+  temp.innerHTML=html||"";
+  return (temp.textContent||temp.innerText||"").trim();
+}
+
+function clearEpisodeMeta(){
+  const box=document.getElementById("episodeMeta");
+  if(!box) return;
+  box.hidden=true;
+  document.getElementById("episodeTitle").textContent="";
+  document.getElementById("episodeSummary").textContent="";
+  document.getElementById("episodeSummary").classList.remove("loading");
+}
+
+async function getTVMazeShowId(showName){
+  const cacheKey="tvmaze-id:"+showName;
+  const cached=localStorage.getItem(cacheKey);
+  if(cached) return Number(cached);
+
+  const res=await fetch("https://api.tvmaze.com/search/shows?q="+encodeURIComponent(showName));
+  if(!res.ok) throw new Error("TVMaze show search failed");
+  const results=await res.json();
+  if(!results.length) throw new Error("Show not found");
+
+  const exact=results.find(x=>x.show && x.show.name.toLowerCase()===showName.toLowerCase());
+  const item=exact||results[0];
+  const id=item.show.id;
+  localStorage.setItem(cacheKey,String(id));
+  return id;
+}
+
+async function loadEpisodeMeta(showName,season,episode){
+  const box=document.getElementById("episodeMeta");
+  const title=document.getElementById("episodeTitle");
+  const summary=document.getElementById("episodeSummary");
+
+  box.hidden=false;
+  title.textContent="Loading episode details…";
+  summary.textContent="";
+  summary.classList.add("loading");
+
+  try{
+    const showId=await getTVMazeShowId(showName);
+    const url=`https://api.tvmaze.com/shows/${showId}/episodebynumber?season=${season}&number=${episode}`;
+    const res=await fetch(url);
+
+    if(!res.ok) throw new Error("Episode metadata unavailable");
+    const data=await res.json();
+
+    title.textContent=data.name||`Season ${season}, Episode ${episode}`;
+    const clean=stripHtml(data.summary);
+    summary.classList.remove("loading");
+    summary.textContent=clean || "No synopsis is available for this episode yet.";
+  }catch(err){
+    title.textContent="";
+    summary.classList.remove("loading");
+    summary.textContent="Episode synopsis isn't available for this numbering yet.";
+  }
 }
 
 function shuffleSelected(){
   const ep=pickEpisode(current);
+  const show=shows[current];
+
   document.getElementById("episode").textContent=
     "S"+String(ep.season).padStart(2,"0")+" · E"+String(ep.episode).padStart(2,"0");
   document.getElementById("episodeInfo").textContent=
-    shows[current].name.toUpperCase()+" — SEASON "+ep.season+", EPISODE "+ep.episode;
+    show.name.toUpperCase()+" — SEASON "+ep.season+", EPISODE "+ep.episode;
+
+  loadEpisodeMeta(show.name,ep.season,ep.episode);
+
   if(navigator.vibrate) navigator.vibrate(30);
 }
 

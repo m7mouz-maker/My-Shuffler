@@ -515,6 +515,29 @@ body::after{
   .episode-headline{gap:9px}
   .imdb-rating{font-size:11px;padding:5px 8px}
 }
+
+.library-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 10px 16px}
+.library-head .library-title{margin:0}
+.add-show-btn{min-height:36px;padding:0 12px;border-radius:13px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);color:#fff;font-size:12px;font-weight:850;cursor:pointer;backdrop-filter:blur(18px)}
+.modal-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:end center;padding:16px;background:rgba(2,4,8,.64);backdrop-filter:blur(10px)}
+.modal-backdrop[hidden]{display:none}
+.add-show-modal{width:min(700px,100%);max-height:82vh;overflow:auto;border-radius:28px;padding:20px}
+.modal-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.modal-kicker{font-size:10px;letter-spacing:3px;color:#8e95a4;font-weight:800}
+.modal-title{margin-top:4px;font-size:28px;font-weight:950}
+.modal-close{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:24px;line-height:1}
+.search-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:18px}
+.show-search-input{min-height:48px;border-radius:16px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);color:#fff;padding:0 14px;font-size:16px;outline:none}
+.show-search-btn{min-width:92px;border:0;border-radius:16px;background:#fff;color:#111;font-weight:900;padding:0 16px}
+.show-search-status{min-height:24px;margin:14px 2px 6px;color:#9ba2b0;font-size:13px}
+.show-search-results{display:grid;gap:10px}
+.search-result{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;min-height:78px;padding:8px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)}
+.search-result img{width:64px;height:64px;object-fit:cover;border-radius:14px;background:#151922}
+.search-result-title{font-size:16px;font-weight:900}
+.search-result-meta{margin-top:3px;font-size:12px;color:#8f96a4}
+.add-result-btn{min-height:38px;padding:0 12px;border-radius:12px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.08);color:#fff;font-weight:850}
+@media(max-width:520px){.search-result{grid-template-columns:54px 1fr auto}.search-result img{width:54px;height:54px}.add-result-btn{padding:0 9px;font-size:12px}}
+
 </style>
 </head>
 <body>
@@ -562,12 +585,33 @@ body::after{
   </section>
 
   <section class="library glass">
-    <div class="library-title">Choose a show</div>
+    <div class="library-head">
+  <div class="library-title">Choose a show</div>
+  <button id="addShowBtn" class="add-show-btn" onclick="openAddShow()">＋ Add Show</button>
+</div>
     <div id="showList" class="show-list"></div>
 
   </section>
 
-  <div class="footer">Broadcast-season numbering is used. Streaming services may group specials differently.</div>
+  <div id="addShowModal" class="modal-backdrop" hidden>
+  <div class="add-show-modal glass">
+    <div class="modal-top">
+      <div>
+        <div class="modal-kicker">ADD SHOW</div>
+        <div class="modal-title">Search a series</div>
+      </div>
+      <button class="modal-close" onclick="closeAddShow()">×</button>
+    </div>
+    <div class="search-row">
+      <input id="showSearchInput" class="show-search-input" type="search" placeholder="e.g. American Dad">
+      <button class="show-search-btn" onclick="searchShows()">Search</button>
+    </div>
+    <div id="showSearchStatus" class="show-search-status"></div>
+    <div id="showSearchResults" class="show-search-results"></div>
+  </div>
+</div>
+
+<div class="footer">Broadcast-season numbering is used. Streaming services may group specials differently.</div>
 </div>
 
 <script>
@@ -576,6 +620,130 @@ const disneyLogo="https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_
 </script>
 <script src="shows.js"></script>
 <script>
+
+
+const CUSTOM_SHOWS_KEY="myShufflerCustomShows";
+
+function loadCustomShows(){
+  try{
+    const custom=JSON.parse(localStorage.getItem(CUSTOM_SHOWS_KEY)||"{}");
+    Object.entries(custom).forEach(([key,val])=>{shows[key]=val;});
+  }catch(e){}
+}
+
+function saveCustomShow(key,show){
+  let custom={};
+  try{custom=JSON.parse(localStorage.getItem(CUSTOM_SHOWS_KEY)||"{}")}catch(e){}
+  custom[key]=show;
+  localStorage.setItem(CUSTOM_SHOWS_KEY,JSON.stringify(custom));
+  shows[key]=show;
+}
+
+function slugifyShow(name,id){
+  return ("custom-"+(id||name)).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+}
+
+function stripTags(text){
+  const d=document.createElement("div");
+  d.innerHTML=text||"";
+  return (d.textContent||"").trim();
+}
+
+function openAddShow(){
+  document.getElementById("addShowModal").hidden=false;
+  setTimeout(()=>document.getElementById("showSearchInput").focus(),80);
+}
+function closeAddShow(){
+  document.getElementById("addShowModal").hidden=true;
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape") closeAddShow()});
+
+async function searchShows(){
+  const input=document.getElementById("showSearchInput");
+  const q=input.value.trim();
+  const status=document.getElementById("showSearchStatus");
+  const results=document.getElementById("showSearchResults");
+  if(!q) return;
+  status.textContent="Searching…";
+  results.innerHTML="";
+  try{
+    const res=await fetch("https://api.tvmaze.com/search/shows?q="+encodeURIComponent(q));
+    if(!res.ok) throw new Error();
+    const items=await res.json();
+    if(!items.length){status.textContent="No shows found.";return}
+    status.textContent="Choose the correct show:";
+    items.slice(0,8).forEach(({show})=>{
+      const row=document.createElement("div");
+      row.className="search-result";
+      const image=show.image?.medium||show.image?.original||"";
+      const premiered=show.premiered?show.premiered.slice(0,4):"";
+      const genres=(show.genres||[]).slice(0,2).join(" · ");
+      row.innerHTML=`
+        <img src="${image}" alt="">
+        <div>
+          <div class="search-result-title">${show.name}</div>
+          <div class="search-result-meta">${[premiered,genres].filter(Boolean).join(" · ")}</div>
+        </div>
+        <button class="add-result-btn">Add</button>`;
+      row.querySelector("button").onclick=()=>addShowFromTVMaze(show.id);
+      results.appendChild(row);
+    });
+  }catch(err){
+    status.textContent="Couldn't search right now.";
+  }
+}
+
+async function addShowFromTVMaze(tvmazeId){
+  const status=document.getElementById("showSearchStatus");
+  status.textContent="Getting seasons and episodes…";
+  try{
+    const [showRes,episodesRes]=await Promise.all([
+      fetch("https://api.tvmaze.com/shows/"+tvmazeId),
+      fetch("https://api.tvmaze.com/shows/"+tvmazeId+"/episodes?specials=0")
+    ]);
+    if(!showRes.ok||!episodesRes.ok) throw new Error();
+    const show=await showRes.json();
+    const episodes=await episodesRes.json();
+
+    const seasonMap={};
+    episodes.forEach(ep=>{
+      if(!ep.season||!ep.number) return;
+      seasonMap[ep.season]=Math.max(seasonMap[ep.season]||0,ep.number);
+    });
+    const seasons=Object.keys(seasonMap).map(Number).sort((a,b)=>a-b);
+    if(!seasons.length) throw new Error();
+    const maxSeason=Math.max(...seasons);
+    const counts=[];
+    for(let n=1;n<=maxSeason;n++) counts.push(seasonMap[n]||0);
+
+    const key=slugifyShow(show.name,tvmazeId);
+    const customShow={
+      name:show.name,
+      place:(show.network&&show.network.name)||(show.webChannel&&show.webChannel.name)||"TV Series",
+      accent:"#7e8cff",
+      logo:(show.image&&show.image.original)||(show.image&&show.image.medium)||"",
+      backdrop:(show.image&&show.image.original)||(show.image&&show.image.medium)||"",
+      tagline:stripTags(show.summary).slice(0,150)||"Ready for a random episode.",
+      service:{name:"Watch",logo:"",url:show.officialSite||show.url||"#"},
+      counts:counts,
+      tvmazeId:tvmazeId,
+      custom:true
+    };
+
+    saveCustomShow(key,customShow);
+    current=key;
+    localStorage.setItem("lastShow",current);
+    applyTheme();
+    if(typeof clearEpisodeMeta==="function") clearEpisodeMeta();
+    document.getElementById("episode").textContent="S?? · E??";
+    document.getElementById("episodeInfo").textContent=show.name.toUpperCase()+" — READY TO SHUFFLE";
+    closeAddShow();
+  }catch(err){
+    status.textContent="Couldn't add this show automatically.";
+  }
+}
+
+loadCustomShows();
 
 let current=localStorage.getItem("lastShow");
 if(!shows[current]) current="futurama";
@@ -613,7 +781,7 @@ function drawShowList(){
            target="_blank"
            rel="noopener"
            onclick="event.stopPropagation()">
-          <img src="${show.service.logo}" alt="${show.service.name}">
+          ${show.service.logo ? `<img src="${show.service.logo}" alt="${show.service.name}">` : `<span style="font-size:11px;font-weight:900;color:#fff">WATCH</span>`}
         </a>
       </div>
       <div class="chev">›</div>`;
@@ -635,8 +803,16 @@ function applyTheme(){
 
   document.getElementById("heroService").href=show.service.url;
   document.getElementById("heroService").title="Watch on "+show.service.name;
-  document.getElementById("heroServiceLogo").src=show.service.logo;
-  document.getElementById("heroServiceLogo").alt=show.service.name;
+  const heroServiceLogo=document.getElementById("heroServiceLogo");
+  if(show.service.logo){
+    heroServiceLogo.src=show.service.logo;
+    heroServiceLogo.alt=show.service.name;
+    heroServiceLogo.style.display="";
+  }else{
+    heroServiceLogo.removeAttribute("src");
+    heroServiceLogo.alt=show.service.name;
+    heroServiceLogo.style.display="none";
+  }
 
   drawShowList();
 }

@@ -538,6 +538,37 @@ body::after{
 .add-result-btn{min-height:38px;padding:0 12px;border-radius:12px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.08);color:#fff;font-weight:850}
 @media(max-width:520px){.search-result{grid-template-columns:54px 1fr auto}.search-result img{width:54px;height:54px}.add-result-btn{padding:0 9px;font-size:12px}}
 
+
+.library-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.remove-show-btn{
+  min-height:36px;
+  padding:0 12px;
+  border-radius:13px;
+  border:1px solid rgba(255,110,110,.18);
+  background:rgba(255,90,90,.055);
+  color:#ff9a9a;
+  font-size:12px;
+  font-weight:850;
+  cursor:pointer;
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+}
+.remove-show-btn:disabled{
+  opacity:.35;
+  cursor:not-allowed;
+}
+@media(max-width:520px){
+  .library-head{align-items:flex-start}
+  .library-actions{gap:6px}
+  .add-show-btn,.remove-show-btn{padding:0 10px;font-size:11px}
+}
+
 </style>
 </head>
 <body>
@@ -587,7 +618,10 @@ body::after{
   <section class="library glass">
     <div class="library-head">
   <div class="library-title">Choose a show</div>
-  <button id="addShowBtn" class="add-show-btn" onclick="openAddShow()">＋ Add Show</button>
+  <div class="library-actions">
+    <button id="addShowBtn" class="add-show-btn" onclick="openAddShow()">＋ Add Show</button>
+    <button id="removeShowBtn" class="remove-show-btn" onclick="removeCurrentShow()">− Remove Show</button>
+  </div>
 </div>
     <div id="showList" class="show-list"></div>
 
@@ -647,6 +681,49 @@ function stripTags(text){
   const d=document.createElement("div");
   d.innerHTML=text||"";
   return (d.textContent||"").trim();
+}
+
+
+function getCustomShows(){
+  try{
+    return JSON.parse(localStorage.getItem(CUSTOM_SHOWS_KEY)||"{}");
+  }catch(e){
+    return {};
+  }
+}
+
+function updateRemoveButton(){
+  const btn=document.getElementById("removeShowBtn");
+  if(!btn) return;
+  const custom=getCustomShows();
+  const removable=Boolean(current && custom[current]);
+  btn.disabled=!removable;
+  btn.title=removable ? "Remove "+shows[current].name : "Only shows added with Add Show can be removed";
+}
+
+function removeCurrentShow(){
+  const custom=getCustomShows();
+  if(!current || !custom[current]) return;
+
+  const showName=(shows[current]&&shows[current].name)||"this show";
+  if(!window.confirm('Remove "'+showName+'" from My Shuffler?')) return;
+
+  delete custom[current];
+  localStorage.setItem(CUSTOM_SHOWS_KEY,JSON.stringify(custom));
+  delete shows[current];
+
+  const keys=Object.keys(shows);
+  current=keys.length ? keys[0] : "";
+  if(current){
+    localStorage.setItem("lastShow",current);
+    applyTheme();
+    if(typeof clearEpisodeMeta==="function") clearEpisodeMeta();
+    document.getElementById("episode").textContent="S?? · E??";
+    document.getElementById("episodeInfo").textContent=
+      shows[current].name.toUpperCase()+" — READY TO SHUFFLE";
+  }
+  drawShowList();
+  updateRemoveButton();
 }
 
 function openAddShow(){
@@ -737,6 +814,7 @@ async function addShowFromTVMaze(tvmazeId){
     if(typeof clearEpisodeMeta==="function") clearEpisodeMeta();
     document.getElementById("episode").textContent="S?? · E??";
     document.getElementById("episodeInfo").textContent=show.name.toUpperCase()+" — READY TO SHUFFLE";
+    updateRemoveButton();
     closeAddShow();
   }catch(err){
     status.textContent="Couldn't add this show automatically.";
@@ -815,6 +893,7 @@ function applyTheme(){
   }
 
   drawShowList();
+  updateRemoveButton();
 }
 
 function selectShow(key){
@@ -951,6 +1030,7 @@ function shuffleEverything(){
 }
 
 applyTheme();
+updateRemoveButton();
 </script>
 <script>
 if ("serviceWorker" in navigator) {

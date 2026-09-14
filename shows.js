@@ -55,5 +55,19 @@ const shows={
       url:"https://www.iptvsmarters.com/"
     },
     counts:[13,18,17,17,14,17,15,14,14,14,14,14,14,14,14,14,14,14,14,10,10,10,10,10,6,6,5,5]
+  },
+  rickmorty:{
+    name:"Rick and Morty",
+    place:"Dimension C-137",
+    tagline:"Nobody exists on purpose. Everybody's gonna die. Come watch TV.",
+    accent:"#97ce4c",
+    logo:"https://upload.wikimedia.org/wikipedia/commons/b/b1/Rick_and_Morty.svg",
+    backdrop:"https://image.tmdb.org/t/p/original/gGmf3CyHdXvaZtcun0DvU1WSNft.jpg",
+    counts:[11,10,10,10,10,10,10,10,10],
+    service:{
+      name:"Netflix",
+      logo:"https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg",
+      url:"https://www.netflix.com/search?q=Rick%20and%20Morty"
+    }
   }
 };

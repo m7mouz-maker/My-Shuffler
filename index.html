@@ -487,6 +487,34 @@ body::after{
   font-style:italic;
 }
 
+
+.episode-headline{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+.imdb-rating{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:6px 9px;
+  border-radius:999px;
+  border:1px solid rgba(255,215,64,.22);
+  background:rgba(255,215,64,.08);
+  color:#ffd84d;
+  font-size:12px;
+  line-height:1;
+  font-weight:900;
+  white-space:nowrap;
+}
+.imdb-rating[hidden]{display:none}
+.imdb-rating .star{font-size:13px}
+@media(max-width:460px){
+  .episode-headline{gap:9px}
+  .imdb-rating{font-size:11px;padding:5px 8px}
+}
 </style>
 </head>
 <body>
@@ -515,7 +543,10 @@ body::after{
         <div id="episode" class="episode">S?? · E??</div>
         <div id="episodeInfo" class="episode-info">Pick a show and shuffle</div>
         <div id="episodeMeta" class="episode-meta" hidden>
-          <div id="episodeTitle" class="episode-title"></div>
+          <div class="episode-headline">
+            <div id="episodeTitle" class="episode-title"></div>
+            <div id="imdbRating" class="imdb-rating" hidden></div>
+          </div>
           <div id="episodeSummary" class="episode-summary"></div>
         </div>
 
@@ -633,6 +664,8 @@ function clearEpisodeMeta(){
   document.getElementById("episodeTitle").textContent="";
   document.getElementById("episodeSummary").textContent="";
   document.getElementById("episodeSummary").classList.remove("loading");
+  const rating=document.getElementById("imdbRating");
+  if(rating){rating.hidden=true;rating.innerHTML="";}
 }
 
 async function getTVMazeShowId(showName){
@@ -650,6 +683,43 @@ async function getTVMazeShowId(showName){
   const id=item.show.id;
   localStorage.setItem(cacheKey,String(id));
   return id;
+}
+
+
+function getOMDbKey(){
+  let key=localStorage.getItem("omdbApiKey");
+  if(key) return key.trim();
+  key=window.prompt("Enter your OMDb API key once. It will be stored only on this device:");
+  if(!key) return "";
+  key=key.trim();
+  localStorage.setItem("omdbApiKey",key);
+  return key;
+}
+
+async function loadIMDbRating(showName,season,episode){
+  const badge=document.getElementById("imdbRating");
+  if(!badge) return;
+  badge.hidden=true;
+  badge.innerHTML="";
+  const key=getOMDbKey();
+  if(!key) return;
+
+  try{
+    const url=
+      "https://www.omdbapi.com/?apikey="+encodeURIComponent(key)+
+      "&t="+encodeURIComponent(showName)+
+      "&Season="+encodeURIComponent(season)+
+      "&Episode="+encodeURIComponent(episode);
+    const res=await fetch(url);
+    if(!res.ok) throw new Error("OMDb request failed");
+    const data=await res.json();
+    const rating=data && data.imdbRating;
+    if(data.Response==="False" || !rating || rating==="N/A") return;
+    badge.innerHTML='<span class="star">★</span><span>IMDb '+rating+'/10</span>';
+    badge.hidden=false;
+  }catch(err){
+    badge.hidden=true;
+  }
 }
 
 async function loadEpisodeMeta(showName,season,episode){
@@ -691,6 +761,7 @@ function shuffleSelected(){
     show.name.toUpperCase()+" — SEASON "+ep.season+", EPISODE "+ep.episode;
 
   loadEpisodeMeta(show.name,ep.season,ep.episode);
+  loadIMDbRating(show.name,ep.season,ep.episode);
 
   if(navigator.vibrate) navigator.vibrate(30);
 }

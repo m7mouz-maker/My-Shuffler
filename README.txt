@@ -1,8 +1,17 @@
-MY SHUFFLER PWA
+MY SHUFFLER — MODULAR VERSION
 
-1) Upload this entire folder to any HTTPS web host.
-2) Open the URL in Chrome on Android.
-3) Menu > Add to Home screen / Install app.
-4) It opens in standalone mode without normal browser chrome.
+Main benefit:
+- index.html = app design and behavior
+- shows.js = all show data
 
-Note: PWA install/service worker requires HTTPS (except localhost).
+To add a new show later, you normally only edit shows.js.
+
+Upload/replace these files in your GitHub Pages repository:
+- index.html
+- shows.js
+- manifest.webmanifest
+- sw.js
+- icon-192.png
+- icon-512.png
+
+After committing, refresh the installed PWA. If an old cached version appears, fully close and reopen the app.
